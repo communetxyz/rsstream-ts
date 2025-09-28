@@ -1,0 +1,6 @@
+
+> rsstream@0.1.0 start
+> cd dist && node app.js
+
+Trying auth credentials for host
+host logged in
