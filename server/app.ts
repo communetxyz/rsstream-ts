@@ -5,56 +5,34 @@ import nodemailer from "nodemailer"
 import path from "path"
 import {fileURLToPath} from "url"
 import Holster from "@mblaney/holster/src/holster.js"
-
-// Type declarations
-interface Account {
-  pub?: string;
-  epub?: string;
-  username?: string;
-  name?: string;
-  email?: any;
-  validate?: any;
-  reset?: any;
-  expiry?: number;
-  subscribed?: number;
-  feeds?: number;
-  ref?: string;
-  host?: string;
-  prev?: string;
-}
-
-interface Feed {
-  subscriber_count: number;
-}
-
-interface FeedData {
-  add?: {
-    url: string;
-    title: string;
-    description?: string;
-    html_url?: string;
-    language?: string;
-    image?: string;
-  };
-  error?: string;
-}
-
-interface RemoveItem {
-  guid: string;
-  url: string;
-}
-
-interface ItemData {
-  title: string;
-  content: string;
-  author: string;
-  permalink: string;
-  guid: string;
-  timestamp: number;
-  url: string;
-  enclosure?: any;
-  category?: any;
-}
+import { z } from "zod"
+import { validateBody } from "./middleware/validation.js"
+import {
+  type Account,
+  AccountSchema,
+  type Feed,
+  FeedSchema,
+  type FeedData,
+  FeedDataSchema,
+  type RemoveItem,
+  RemoveItemSchema,
+  type ItemData,
+  ItemDataSchema,
+  type InviteCode,
+  InviteCodeDataSchema,
+  CheckInviteCodeRequestSchema,
+  ClaimInviteCodeRequestSchema,
+  ValidateEmailRequestSchema,
+  ResetPasswordRequestSchema,
+  UpdatePasswordRequestSchema,
+  AddFeedRequestSchema,
+  SubscriberRequestSchema,
+  CreateInviteCodesRequestSchema,
+  SendInviteCodeRequestSchema,
+  UpdateFeedLimitRequestSchema,
+  RemoveFeedRequestSchema,
+  AddItemRequestSchema,
+} from "../shared/schemas.js"
 
 const holster = Holster({secure: true})
 const user = holster.user()
@@ -83,11 +61,6 @@ const basicAuth = (req: Request, res: Response, next: NextFunction) => {
 
 // inviteCodes is a map of invite codes and their (random) holster keys, stored
 // in memory to avoid decrypting them in each of the functions they're required.
-interface InviteCode {
-  code: string;
-  owner: string;
-  key?: string;
-}
 const inviteCodes = new Map<string, InviteCode>()
 
 // removeDays is a set of days where old data has already been removed so that
@@ -192,7 +165,7 @@ app.post("/check-codes", async (req: Request, res: Response) => {
   res.status(400).send("duplicate code found")
 })
 
-app.post("/check-invite-code", (req: Request, res: Response) => {
+app.post("/check-invite-code", validateBody(CheckInviteCodeRequestSchema), (req: Request, res: Response) => {
   const code = req.body.code || "admin"
   if (inviteCodes.has(code)) {
     res.end() // ok
@@ -217,35 +190,14 @@ app.post("/check-invite-code", (req: Request, res: Response) => {
   })
 })
 
-app.post("/claim-invite-code", async (req: Request, res: Response) => {
+app.post("/claim-invite-code", validateBody(ClaimInviteCodeRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code || "admin"
   const invite = inviteCodes.get(code)
   if (!invite) {
     res.status(404).send("Invite code not found")
     return
   }
-  if (!req.body.pub) {
-    res.status(400).send("Public key required")
-    return
-  }
-  if (!req.body.epub) {
-    res.status(400).send("Epub key required")
-    return
-  }
-  if (!req.body.username) {
-    res.status(400).send("Username required")
-    return
-  }
-  if (!/^\w+$/.test(req.body.username)) {
-    res
-      .status(400)
-      .send("Username must contain only numbers, letters and underscore")
-    return
-  }
-  if (!req.body.email) {
-    res.status(400).send("Email required")
-    return
-  }
+  // Validation handled by Zod middleware
   if (!user.is) {
     res.status(500).send("Host error")
     return
@@ -345,7 +297,7 @@ app.post("/claim-invite-code", async (req: Request, res: Response) => {
   res.end()
 })
 
-app.post("/validate-email", async (req: Request, res: Response) => {
+app.post("/validate-email", validateBody(ValidateEmailRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("Invite code required")
@@ -392,7 +344,7 @@ app.post("/validate-email", async (req: Request, res: Response) => {
     })
 })
 
-app.post("/reset-password", async (req: Request, res: Response) => {
+app.post("/reset-password", validateBody(ResetPasswordRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("Invite code required")
@@ -456,7 +408,7 @@ app.post("/reset-password", async (req: Request, res: Response) => {
     })
 })
 
-app.post("/update-password", async (req: Request, res: Response) => {
+app.post("/update-password", validateBody(UpdatePasswordRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("Invite code required")
@@ -566,7 +518,7 @@ app.post("/update-password", async (req: Request, res: Response) => {
     })
 })
 
-app.post("/add-feed", async (req: Request, res: Response) => {
+app.post("/add-feed", validateBody(AddFeedRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send({error: "code required"})
@@ -673,7 +625,7 @@ app.post("/add-feed", async (req: Request, res: Response) => {
   }
 })
 
-app.post("/add-subscriber", async (req: Request, res: Response) => {
+app.post("/add-subscriber", validateBody(SubscriberRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send({error: "code required"})
@@ -743,7 +695,7 @@ app.post("/add-subscriber", async (req: Request, res: Response) => {
     })
 })
 
-app.post("/remove-subscriber", async (req: Request, res: Response) => {
+app.post("/remove-subscriber", validateBody(SubscriberRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send({error: "code required"})
@@ -834,7 +786,7 @@ app.post("/remove-subscriber", async (req: Request, res: Response) => {
     })
 })
 
-app.post("/private/create-invite-codes", async (req: Request, res: Response) => {
+app.post("/private/create-invite-codes", validateBody(CreateInviteCodesRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("code required")
@@ -867,7 +819,7 @@ app.post("/private/create-invite-codes", async (req: Request, res: Response) => 
     .send("Error creating codes. Please check logs for errors and try again")
 })
 
-app.post("/private/send-invite-code", (req: Request, res: Response) => {
+app.post("/private/send-invite-code", validateBody(SendInviteCodeRequestSchema), (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("code required")
@@ -884,7 +836,7 @@ app.post("/private/send-invite-code", (req: Request, res: Response) => {
   res.end()
 })
 
-app.post("/private/update-feed-limit", async (req: Request, res: Response) => {
+app.post("/private/update-feed-limit", validateBody(UpdateFeedLimitRequestSchema), async (req: Request, res: Response) => {
   const code = req.body.code
   if (!code) {
     res.status(400).send("code required")
@@ -926,7 +878,7 @@ app.post("/private/update-feed-limit", async (req: Request, res: Response) => {
     })
 })
 
-app.post("/private/remove-feed", (req: Request, res: Response) => {
+app.post("/private/remove-feed", validateBody(RemoveFeedRequestSchema), (req: Request, res: Response) => {
   if (!req.body.url) {
     res.status(400).send("url required")
     return
@@ -958,7 +910,7 @@ app.post("/private/remove-feed", (req: Request, res: Response) => {
     })
 })
 
-app.post("/private/add-item", async (req: Request, res: Response) => {
+app.post("/private/add-item", validateBody(AddItemRequestSchema), async (req: Request, res: Response) => {
   if (!req.body.url) {
     res.status(400).send("url required")
     return

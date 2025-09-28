@@ -1,0 +1,1 @@
+{"version":3,"file":"serviceWorkerRegistration.d.ts","sourceRoot":"","sources":["../../../../browser/src/serviceWorkerRegistration.ts"],"names":[],"mappings":"AAsBA,UAAU,MAAM;IACd,SAAS,CAAC,EAAE,CAAC,YAAY,EAAE,yBAAyB,KAAK,IAAI,CAAC;IAC9D,QAAQ,CAAC,EAAE,CAAC,YAAY,EAAE,yBAAyB,KAAK,IAAI,CAAC;CAC9D;AAED,wBAAgB,QAAQ,CAAC,MAAM,CAAC,EAAE,MAAM,QAgCvC;AA4ED,wBAAgB,UAAU,SAUzB"}

@@ -14,169 +14,220 @@ import Typography from "@mui/material/Typography"
 import Visibility from "@mui/icons-material/Visibility"
 import VisibilityOff from "@mui/icons-material/VisibilityOff"
 import SearchAppBar from "./SearchAppBar"
+import { z } from "zod"
+import { useZodForm } from "../hooks/useZodForm"
+import { RegisterRequestSchema } from "../../shared/schemas"
 
 const Register = ({user, mode, setMode}: any) => {
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [email, setEmail] = useState("")
-  const [code, setCode] = useState("")
   const [message, setMessage] = useState(user.is ? "Already logged in" : "")
   const [disabledButton, setDisabledButton] = useState(user.is)
 
-  const register = () => {
-    if (!username) {
-      setMessage("Please choose a username")
-      return
-    }
-    if (!/^\w+$/.test(username)) {
-      setMessage("Username must contain only numbers, letters and underscore")
-      return
-    }
-    if (!email) {
-      setMessage("Please provide your email")
-      return
-    }
-
-    setDisabledButton(true)
-    setMessage("Checking invite code...")
-    fetch(`${window.location.origin}/check-invite-code`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json;charset=utf-8",
-      },
-      body: JSON.stringify({code: code}),
-    })
-      .then(res => res.text().then(text => ({ok: res.ok, text: text})))
-      .then(res => {
-        if (!res.ok) {
+  const form = useZodForm({
+    schema: RegisterRequestSchema,
+    onSubmit: async (data) => {
+      setDisabledButton(true)
+      setMessage("Checking invite code...")
+      
+      try {
+        // First check the invite code
+        const checkRes = await fetch(`${window.location.origin}/check-invite-code`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json;charset=utf-8",
+          },
+          body: JSON.stringify({code: data.code}),
+        })
+        
+        if (!checkRes.ok) {
+          const text = await checkRes.text()
+          setMessage(text)
           setDisabledButton(false)
-          setMessage(res.text)
           return
         }
 
-        user.create(username, password, err => {
+        // Create the user account
+        user.create(data.username, data.password, (err: any) => {
           if (err) {
+            console.log(err)
+            setMessage("Registration failed, please try again")
             setDisabledButton(false)
-            setMessage(err)
             return
           }
 
-          user.auth(username, password, err => {
-            if (err) {
+          user.auth(data.username, data.password, async (authErr: any) => {
+            if (authErr) {
+              console.log(authErr)
+              setMessage("Please try again or log in manually")
               setDisabledButton(false)
-              setMessage(err)
               return
             }
 
-            fetch(`${window.location.origin}/claim-invite-code`, {
+            setMessage("Account created, saving to server...")
+            
+            // Claim the invite code
+            const claimRes = await fetch(`${window.location.origin}/claim-invite-code`, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json;charset=utf-8",
               },
               body: JSON.stringify({
-                code: code,
+                code: data.code,
                 pub: user.is.pub,
                 epub: user.is.epub,
-                username: username,
-                email: email,
+                username: data.username,
+                email: data.email,
               }),
             })
-              .then(res => res.text().then(text => ({ok: res.ok, text: text})))
-              .then(res => {
-                setDisabledButton(false)
-                if (!res.ok) {
-                  user.delete(username, password, console.log)
-                  setMessage(res.text)
-                  return
-                }
 
-                setMessage("Account created")
-                window.location.href = "/login"
-              })
+            if (!claimRes.ok) {
+              const text = await claimRes.text()
+              setMessage(text)
+              user.leave()
+              setDisabledButton(false)
+              return
+            }
+
+            sessionStorage.setItem("code", data.code)
+            window.location.href = "/"
           })
         })
-      })
+      } catch (error) {
+        console.error(error)
+        setMessage("Registration failed, please try again")
+        setDisabledButton(false)
+      }
+    },
+    initialValues: {
+      code: "",
+      username: "",
+      password: "",
+      email: "",
+    }
+  })
+
+  const handleClickShowPassword = () => setShowPassword((show) => !show)
+
+  const handleMouseDownPassword = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
   }
 
   return (
     <>
-      {user.is && <SearchAppBar mode={mode} setMode={setMode} />}
+      <SearchAppBar
+        page="register"
+        showGroupList={() => {}}
+        createGroup={() => {}}
+        editGroup={() => {}}
+        createFeed={() => {}}
+        mode={mode}
+        setMode={setMode}
+        title=""
+      />
       <Container maxWidth="sm">
-        <Grid container>
-          <Grid item xs={12}>
-            <Card sx={{mt: 2}}>
-              <CardContent>
-                <Typography variant="h5">Register</Typography>
-                <TextField
-                  id="register-username"
-                  label="Username"
-                  variant="outlined"
-                  fullWidth={true}
-                  margin="normal"
-                  value={username}
-                  onChange={event => setUsername(event.target.value)}
-                />
-                <FormControl
-                  variant="outlined"
-                  fullWidth={true}
-                  margin="normal"
-                >
-                  <InputLabel htmlFor="register-password">Password</InputLabel>
-                  <OutlinedInput
-                    id="register-password"
-                    value={password}
-                    onChange={event => setPassword(event.target.value)}
-                    type={showPassword ? "text" : "password"}
-                    endAdornment={
-                      <InputAdornment position="end">
-                        <IconButton
-                          aria-label="toggle password visibility"
-                          onClick={() => setShowPassword(show => !show)}
-                          edge="end"
-                        >
-                          {showPassword ? <VisibilityOff /> : <Visibility />}
-                        </IconButton>
-                      </InputAdornment>
-                    }
-                    label="Password"
-                  />
-                </FormControl>
-                <TextField
-                  id="register-email"
-                  label="Email"
-                  variant="outlined"
-                  fullWidth={true}
-                  margin="normal"
-                  value={email}
-                  onChange={event => setEmail(event.target.value)}
-                />
-                <TextField
-                  id="register-code"
-                  label="Invite code"
-                  variant="outlined"
-                  fullWidth={true}
-                  margin="normal"
-                  value={code}
-                  onChange={event => setCode(event.target.value)}
-                />
-                <Button
-                  sx={{mt: 1}}
-                  variant="contained"
-                  disabled={disabledButton}
-                  onClick={register}
-                >
-                  Submit
-                </Button>
-                {message && (
-                  <Typography sx={{m: 1}} variant="body2">
-                    {message}
+        <Card>
+          <CardContent>
+            <form onSubmit={form.handleSubmit}>
+              <Grid container>
+                <Grid item xs={12}>
+                  <Typography
+                    align="center"
+                    variant="h6"
+                    sx={{padding: 1}}
+                    color="text.secondary"
+                  >
+                    Create an account
                   </Typography>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Invite Code"
+                    variant="outlined"
+                    {...form.getFieldProps('code')}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Username"
+                    variant="outlined"
+                    {...form.getFieldProps('username')}
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <FormControl fullWidth margin="normal" variant="outlined" error={!!form.errors.password}>
+                    <InputLabel htmlFor="password">Password</InputLabel>
+                    <OutlinedInput
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      {...form.getFieldProps('password')}
+                      endAdornment={
+                        <InputAdornment position="end">
+                          <IconButton
+                            aria-label="toggle password visibility"
+                            onClick={handleClickShowPassword}
+                            onMouseDown={handleMouseDownPassword}
+                            edge="end"
+                          >
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      }
+                      label="Password"
+                    />
+                    {form.errors.password && (
+                      <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
+                        {form.errors.password}
+                      </Typography>
+                    )}
+                  </FormControl>
+                </Grid>
+
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    margin="normal"
+                    label="Email"
+                    variant="outlined"
+                    type="email"
+                    {...form.getFieldProps('email')}
+                  />
+                </Grid>
+
+                {message && (
+                  <Grid item xs={12}>
+                    <Typography
+                      align="center"
+                      variant="body2"
+                      sx={{padding: 2}}
+                      color={message.includes("failed") || message.includes("error") ? "error" : "text.secondary"}
+                    >
+                      {message}
+                    </Typography>
+                  </Grid>
                 )}
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+
+                <Grid item xs={12}>
+                  <Button
+                    fullWidth
+                    variant="contained"
+                    type="submit"
+                    disabled={disabledButton || form.isSubmitting}
+                    sx={{margin: 2}}
+                  >
+                    Register
+                  </Button>
+                </Grid>
+              </Grid>
+            </form>
+          </CardContent>
+        </Card>
       </Container>
     </>
   )

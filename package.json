@@ -1,0 +1,15 @@
+{
+  "name": "refactor",
+  "version": "1.0.0",
+  "description": "RSStream is a local first web application that uses a distributed database in the browser called [Holster](https://github.com/mblaney/holster). The server runs a [Node.js](https://nodejs.org) app that listens for feed updates from [Dobrado](https://dobrado.net) and pushes updates to the browser.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "zod": "^4.1.11"
+  }
+}
