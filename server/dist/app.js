@@ -968,17 +968,22 @@ function mapInviteCodes() {
         return;
     }
     const mapCodes = async (codes) => {
-        if (!codes)
+        if (!codes) {
+            console.log("No invite codes found");
             return;
+        }
+        console.log("Mapping invite codes...");
         for (const [key, enc] of Object.entries(codes)) {
             const invite = await holster.SEA.decrypt(enc, user.is);
             if (invite && !inviteCodes.has(invite.code)) {
                 invite.key = key;
                 inviteCodes.set(invite.code, invite);
+                console.log(`Loaded invite code: ${invite.code}`);
             }
         }
+        console.log(`Total invite codes loaded: ${inviteCodes.size}`);
     };
-    user.get("available").next("invite_codes").on(mapCodes);
+    user.get("available").next("invite_codes").on(mapCodes, true);
 }
 // day is a helper function that returns the zero timestamp on the day of the
 // given timestamp. This is used because items are grouped by day to make it

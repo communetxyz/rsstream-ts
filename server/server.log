@@ -1,6 +1,5 @@
-
-> rsstream@0.1.0 start
-> cd dist && node app.js
-
 Trying auth credentials for host
 host logged in
+Mapping invite codes...
+Loaded invite code: admin
+Total invite codes loaded: 1
